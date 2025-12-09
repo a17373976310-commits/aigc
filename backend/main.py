@@ -39,7 +39,7 @@ HISTORY_FILE = os.path.join(HISTORY_DIR, 'history.json')
 UPLOADS_DIR = os.path.join(os.getcwd(), 'static', 'uploads')
 USE_SYSTEM_PROXIES = os.environ.get("USE_SYSTEM_PROXIES", "0") == "1"
 PROXIES_ENV = None if USE_SYSTEM_PROXIES else {"http": None, "https": None}
-DEFAULT_TIMEOUT = 60
+DEFAULT_TIMEOUT = 180
 
 # Ensure directories exist
 os.makedirs(HISTORY_DIR, exist_ok=True)
