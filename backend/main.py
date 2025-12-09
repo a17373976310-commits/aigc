@@ -189,7 +189,9 @@ def generate_image_internal(prompt, model, ratio, image_files, api_key):
         "Authorization": f"Bearer {api_key}"
     }
     
-    if image_files:
+    # Disable img2img for now as upstream API is broken (image_size error)
+    # We rely on the optimized prompt (which analyzed the image) for generation.
+    if image_files and False: 
         url = f"{BASE_URL.rstrip('/')}/images/edits"
         print(f"Sending Img2Img request to: {url}")
         
@@ -203,7 +205,8 @@ def generate_image_internal(prompt, model, ratio, image_files, api_key):
         data_payload = {
             "model": model,
             "prompt": prompt,
-            "n": 1
+            "n": 1,
+            "image_size": "1024x1024"
             # "size": size  # Removing size for img2img as it causes API error
         }
         

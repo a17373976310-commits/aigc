@@ -391,6 +391,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data.style_id) applyTheme(data.style_id);
         if (data.layout) renderTextOverlay(data.layout);
         displayGeneratedImage(data.image_path || data.image_url, data.image_url);
+        setLoading(false);
     }
 
     function applyTheme(styleId) {
@@ -420,41 +421,50 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let lastImageSources = [];
     // Display generated image
+    let currentGenerationId = 0;
+
+    function setLoading(isLoading) {
+        if (isLoading) {
+            generateBtn.classList.add('loading');
+            generateBtn.disabled = true;
+        } else {
+            generateBtn.classList.remove('loading');
+            generateBtn.disabled = false;
+        }
+    }
+
+    // ... (history code) ...
+
+    // Display generated image
     function displayGeneratedImage(imageUrl, fallbackUrl) {
+        // Capture the generation ID at the start of this function call? 
+        // No, this function is called WHEN generation finishes.
+        // We need to check if the generation that just finished is still relevant?
+        // Actually, the issue is that history view clears the loading state.
+
         lastImageSources = [imageUrl, fallbackUrl].filter(Boolean);
-        generatedImage.onerror = () => {
-            if (fallbackUrl && generatedImage.src !== fallbackUrl) {
-                generatedImage.src = fallbackUrl;
-            } else {
-                const canvasContainer = document.getElementById('canvasContainer');
-                if (canvasContainer) {
-                    canvasContainer.classList.remove('hidden');
-                    emptyContent.classList.add('hidden');
-                    imageContainer.classList.remove('empty-state');
-                } else {
-                    generatedImage.classList.remove('hidden');
-                    emptyContent.classList.add('hidden');
-                    imageContainer.classList.remove('empty-state');
-                }
-                setLoading(false);
-                loadHistory();
-            }
-        };
+
+        // We don't rely on onload to clear loading state anymore for the main generation flow
+        // to avoid race conditions with history view.
+        // But we DO need to wait for image to load to show it?
+        // Let's just set src and clear loading immediately, but keep the spinner on the image itself if needed.
+        // Or better: ensure setLoading(false) is called explicitly by the generation function, NOT by the image onload.
+
+        generatedImage.onload = null; // Clear any history handlers
+        generatedImage.onerror = null;
+
         generatedImage.src = imageUrl;
-        generatedImage.onload = () => {
-            const canvasContainer = document.getElementById('canvasContainer');
-            if (canvasContainer) {
-                canvasContainer.classList.remove('hidden');
-                emptyContent.classList.add('hidden');
-                imageContainer.classList.remove('empty-state');
-            } else {
-                generatedImage.classList.remove('hidden');
-                emptyContent.classList.add('hidden');
-                imageContainer.classList.remove('empty-state');
-            }
-            setLoading(false);
-            loadHistory();
-        };
+
+        const canvasContainer = document.getElementById('canvasContainer');
+        if (canvasContainer) {
+            canvasContainer.classList.remove('hidden');
+        } else {
+            generatedImage.classList.remove('hidden');
+        }
+        emptyContent.classList.add('hidden');
+        imageContainer.classList.remove('empty-state');
+
+        loadHistory();
     }
 
     // Render text overlay for Taobao mode
