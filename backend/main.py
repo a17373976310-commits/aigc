@@ -176,13 +176,13 @@ def extract_image_from_result(result: dict):
         return None, None
 
 def generate_image_internal(prompt, model, ratio, image_files, api_key):
-    # SDXL compatible resolutions
+    # Use standard safe resolutions to prevent timeouts and compatibility issues
     size_map = {
-        "1:1": "1024x1024",
-        "9:16": "832x1216",
-        "16:9": "1216x832",
-        "3:4": "896x1152",
-        "4:3": "1152x896"
+        "1:1": "512x512",
+        "9:16": "512x896",
+        "16:9": "896x512",
+        "3:4": "512x680",
+        "4:3": "680x512"
     }
     size = size_map.get(ratio, "1024x1024")
     
@@ -481,4 +481,5 @@ async def serve_static_root(path: str):
     return JSONResponse(status_code=404, content={"message": "File not found"})
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
