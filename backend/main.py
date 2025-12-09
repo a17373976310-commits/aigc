@@ -176,12 +176,13 @@ def extract_image_from_result(result: dict):
         return None, None
 
 def generate_image_internal(prompt, model, ratio, image_files, api_key):
+    # SDXL compatible resolutions
     size_map = {
         "1:1": "1024x1024",
-        "9:16": "720x1280",
-        "16:9": "1280x720",
-        "3:4": "768x1024",
-        "4:3": "1024x768"
+        "9:16": "832x1216",
+        "16:9": "1216x832",
+        "3:4": "896x1152",
+        "4:3": "1152x896"
     }
     size = size_map.get(ratio, "1024x1024")
     
@@ -206,7 +207,8 @@ def generate_image_internal(prompt, model, ratio, image_files, api_key):
             "model": model,
             "prompt": prompt,
             "n": 1,
-            "image_size": "1024x1024"
+            "image_size": "1024x1024",
+            "response_format": "b64_json"
             # "size": size  # Removing size for img2img as it causes API error
         }
         
@@ -214,11 +216,13 @@ def generate_image_internal(prompt, model, ratio, image_files, api_key):
     else:
         headers["Content-Type"] = "application/json"
         url = f"{BASE_URL.rstrip('/')}/images/generations"
+
         payload = {
             "model": model,
             "prompt": prompt,
             "n": 1,
-            "size": size 
+            "size": size,
+            "response_format": "b64_json"
         }
         print(f"Sending Image request to: {url} with size {size}")
         response = _session().post(url, json=payload, headers=headers, timeout=DEFAULT_TIMEOUT, proxies=PROXIES_ENV)

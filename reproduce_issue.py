@@ -16,7 +16,7 @@ def test_img2img():
     data = {
         'prompt': 'a cute cat',
         'model': 'nano-banana-2',
-        'ratio': '1:1'
+        'ratio': '9:16'
     }
     
     # Need API Key in header

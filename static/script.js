@@ -322,6 +322,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         displayGeneratedImage(data.image_path || data.image_url, data.image_url);
+        setLoading(false);
     }
 
     // Taobao Mode - A-V-A Workflow
