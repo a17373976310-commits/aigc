@@ -455,6 +455,11 @@ async def generate_ecommerce_api(
         traceback.print_exc()
         return JSONResponse(status_code=500, content={"error": str(e)})
 
+# Serve index.html at root
+@app.get("/")
+async def read_root():
+    return FileResponse(os.path.join("static", "index.html"))
+
 # Catch-all for static files (must be last)
 @app.get("/{path:path}")
 async def serve_static_root(path: str):
