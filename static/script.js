@@ -625,6 +625,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     const sources = [normalize(item.composite_path), normalize(item.image_path), normalize(item.image_url)].filter(Boolean);
                     const src = sources[0];
                     if (src) {
+                        // Clear previous handlers to prevent state corruption
+                        generatedImage.onload = null;
+                        generatedImage.onerror = null;
+
                         // Update main preview image
                         generatedImage.src = src;
                         // Ensure preview container is visible
