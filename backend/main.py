@@ -200,10 +200,12 @@ def generate_image_internal(prompt, model, ratio, image_files, api_key):
             content = img.file.read()
             files_payload.append(('image', (img.filename, content, img.content_type)))
         
+        data_payload = {
             "model": model,
             "prompt": prompt,
             "n": 1
             # "size": size  # Removing size for img2img as it causes API error
+        }
         
         response = _session().post(url, data=data_payload, files=files_payload, headers=headers, timeout=DEFAULT_TIMEOUT, proxies=PROXIES_ENV)
     else:

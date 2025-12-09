@@ -291,32 +291,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let response;
 
-        if (selectedFiles.length > 0) {
-            const formData = new FormData();
-            formData.append('prompt', prompt);
-            formData.append('model', model);
-            formData.append('ratio', currentRatio);
+        const formData = new FormData();
+        formData.append('prompt', prompt);
+        formData.append('model', model);
+        formData.append('ratio', currentRatio);
 
+        if (selectedFiles.length > 0) {
             selectedFiles.forEach(file => {
                 formData.append('image', file);
             });
-
-            response = await fetch('/api/generate', {
-                method: 'POST',
-                headers: getHeaders(),
-                body: formData
-            });
-        } else {
-            response = await fetch('/api/generate', {
-                method: 'POST',
-                headers: getHeaders('application/json'),
-                body: JSON.stringify({
-                    prompt,
-                    model,
-                    ratio: currentRatio
-                }),
-            });
         }
+
+        response = await fetch('/api/generate', {
+            method: 'POST',
+            headers: getHeaders(),
+            body: formData
+        });
 
         const data = await (async () => {
             const ct = response.headers.get('content-type') || '';
