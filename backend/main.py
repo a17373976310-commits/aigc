@@ -221,8 +221,7 @@ def generate_image_internal(prompt, model, ratio, image_files, api_key):
             "model": model,
             "prompt": prompt,
             "n": 1,
-            "size": size,
-            "response_format": "b64_json"
+            "size": size
         }
         print(f"Sending Image request to: {url} with size {size}")
         response = _session().post(url, json=payload, headers=headers, timeout=DEFAULT_TIMEOUT, proxies=PROXIES_ENV)
