@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+env/
+venv/
+*.log
+ngrok.exe
+static/history/*
+!static/history/.gitkeep
+static/uploads/*
+!static/uploads/.gitkeep
+.gemini/

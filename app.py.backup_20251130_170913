@@ -1,0 +1,781 @@
+import os
+import json
+import time
+import requests
+import re
+from flask import Flask, request, jsonify, send_from_directory
+
+app = Flask(__name__, static_folder='static')
+
+# Configuration
+API_KEY = "sk-vEJlXLh2lKjrquq82BZwZ8MNuVoLsWJRIwAob1Nqk2Eix80r" 
+BASE_URL = "https://ai.comfly.chat/v1"
+MODEL_NAME = "nano-banana"
+HISTORY_DIR = os.path.join('static', 'history')
+HISTORY_FILE = os.path.join(HISTORY_DIR, 'history.json')
+
+DEFAULT_TIMEOUT = 60
+
+# 风格映射表：5 大视觉原型
+STYLE_VISUAL_PROMPTS = {
+    'Tech_Dark': {
+        'background': 'dark gradient background from deep blue to black',
+        'lighting': 'dramatic side lighting with blue accent lights',
+        'mood': 'futuristic, high-tech, sleek and modern',
+        'extras': 'subtle grid pattern, holographic effects, sci-fi atmosphere'
+    },
+    'Pure_Clinical': {
+        'background': 'pure white background, seamless and clean',
+        'lighting': 'soft diffused lighting, bright and even illumination',
+        'mood': 'clean, professional, clinical and precise',
+        'extras': 'minimal shadows, scientific precision, medical-grade quality'
+    },
+    'Organic_Warm': {
+        'background': 'natural wood texture or marble surface, warm tones',
+        'lighting': 'warm natural sunlight, soft shadows',
+        'mood': 'cozy, organic, homely and inviting',
+        'extras': 'natural elements like plants or fresh ingredients nearby'
+    },
+    'Vibrant_Pop': {
+        'background': 'vibrant gradient background with bold saturated colors',
+        'lighting': 'bright colorful lighting, high contrast and dynamic',
+        'mood': 'energetic, playful, youthful and fun',
+        'extras': 'geometric shapes, dynamic composition, pop art style'
+    },
+    'Luxury_Gold': {
+        'background': 'elegant dark background with subtle gold accents',
+        'lighting': 'warm golden hour lighting, soft glow and highlights',
+        'mood': 'luxurious, premium, sophisticated and refined',
+        'extras': 'subtle bokeh effect, refined details, high-end presentation'
+    }
+}
+
+def _session():
+    s = requests.Session()
+    # s.trust_env = False
+    # s.proxies = {"http": None, "https": None}  # Allow system proxies
+    return s
+
+def ensure_history_dir():
+    if not os.path.exists(HISTORY_DIR):
+        os.makedirs(HISTORY_DIR)
+    if not os.path.exists(HISTORY_FILE):
+        with open(HISTORY_FILE, 'w') as f:
+            json.dump([], f)
+
+def save_history_item(prompt, model, ratio, image_url):
+    ensure_history_dir()
+    
+    try:
+        # Download image
+        print(f"[History] Downloading image from: {image_url}")
+        response = _session().get(image_url, timeout=DEFAULT_TIMEOUT)
+        if response.status_code == 200:
+            timestamp = int(time.time() * 1000)
+            filename = f"{timestamp}.png"
+            filepath = os.path.join(HISTORY_DIR, filename)
+            
+            with open(filepath, 'wb') as f:
+                f.write(response.content)
+            
+            # Update history.json
+            with open(HISTORY_FILE, 'r') as f:
+                history = json.load(f)
+            
+            new_item = {
+                "id": timestamp,
+                "prompt": prompt,
+                "model": model,
+                "ratio": ratio,
+                "image_path": f"static/history/{filename}",
+                "timestamp": timestamp
+            }
+            
+            history.insert(0, new_item) # Add to beginning
+            
+            with open(HISTORY_FILE, 'w') as f:
+                json.dump(history, f, indent=2)
+                
+            return new_item
+    except Exception as e:
+        print(f"[History] Error saving history: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+@app.route('/')
+def index():
+    return send_from_directory('static', 'index.html')
+
+@app.route('/<path:path>')
+def serve_static(path):
+    return send_from_directory('static', path)
+
+@app.route('/history', methods=['GET'])
+def get_history():
+    ensure_history_dir()
+    try:
+        with open(HISTORY_FILE, 'r') as f:
+            history = json.load(f)
+        return jsonify(history)
+    except Exception as e:
+        return jsonify([])
+
+@app.route('/optimize-prompt', methods=['POST'])
+def optimize_prompt():
+    if not API_KEY:
+        return jsonify({'error': 'API_KEY is missing'}), 500
+
+    # Handle both JSON and FormData
+    prompt = ""
+    image_files = []
+    
+    if request.content_type.startswith('multipart/form-data'):
+        prompt = request.form.get('prompt', "")
+        image_files = request.files.getlist('image')
+    else:
+        data = request.json
+        prompt = data.get('prompt', "")
+
+    if not prompt and not image_files:
+        return jsonify({'error': 'Prompt or image is required'}), 400
+
+    headers = {
+        'Authorization': f'Bearer {API_KEY}'
+        # Content-Type handled by requests for multipart or set manually for json
+    }
+
+    # Advanced System Instruction (Workflow)
+    system_instruction = """
+{
+  "workflow_id": "Kontext_Visual_Strategist_V_Master_Final_Optimized",
+  "steps": [
+    {
+      "step_id": 0,
+      "name": "Forceful Initial Image Analysis (Perception Phase)",
+      "action": "This is your first step. Before reading any text request from the user, you must deeply analyze the input subject image, generating a structured mental model.",
+      "output_schema_for_internal_use": {
+        "image_type": "string (e.g., 'Realistic Product Photography', '3D Render')",
+        "main_subject": {
+          "description": "string",
+          "key_features": "array of strings"
+        },
+        "environment": {
+          "description": "string",
+          "key_anchors": "array of strings",
+          "depth_composition": "string",
+          "lighting_type": "string",
+          "scene_mood": "string"
+        },
+        "color_palette": "array of strings",
+        "dynamic_elements": "string"
+      }
+    },
+    {
+      "step_id": 1,
+      "name": "Cross-Reference Requirement Decomposition",
+      "action": "Parse user request, decompose into atomic tasks.",
+      "input": ["User Text Request", "Step 0 Analysis", "Reference Images"]
+    },
+    {
+      "step_id": 2,
+      "name": "Instruction Generation with Constraints",
+      "action": "Generate instruction clauses enforcing constraints like No Pronouns, Quotation Mandate, Preservation Priority.",
+      "execution_constraints": {
+        "1_pronoun_ban": "No pronouns allowed. Use specific descriptions from Step 0.",
+        "2_quotation_mandate": "Text edits must be in quotes.",
+        "3_preservation_priority": "Maintain facial features and key elements."
+      }
+    },
+    {
+      "step_id": 4,
+      "name": "JSON Output",
+      "action": "Encapsulate final result.",
+      "output": {
+        "positive_prompt": "string (The final optimized English prompt)",
+        "negative_prompt": "string",
+        "positive_prompt_zh": "string",
+        "execution_advice": "string"
+      }
+    }
+  ],
+  "instruction": "You are the Kontext Visual Strategist. Follow the steps above. Analyze the input image (if provided) and the user's text prompt. Output ONLY valid JSON matching the Step 4 output schema."
+}
+"""
+
+    messages = [
+        {"role": "system", "content": system_instruction},
+        {"role": "user", "content": prompt}
+    ]
+
+    # Add images to the user message if present
+    if image_files:
+        # We need to construct a multimodal message
+        # For OpenAI/Gemini via OpenAI-compat API, it usually looks like:
+        # content: [ {"type": "text", "text": prompt}, {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,..."}} ]
+        
+        import base64
+        
+        content_list = [{"type": "text", "text": prompt}]
+        
+        for img in image_files:
+            img_data = base64.b64encode(img.read()).decode('utf-8')
+            content_list.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{img.content_type};base64,{img_data}"
+                }
+            })
+            
+        messages[1]["content"] = content_list
+
+    payload = {
+        "model": "gemini-3-pro-preview-thinking-*", 
+        "messages": messages,
+        "stream": False,
+        "response_format": { "type": "json_object" } # Force JSON output
+    }
+
+    try:
+        # For multimodal, we must use json payload, not multipart
+        headers['Content-Type'] = 'application/json'
+        
+        response = _session().post(f"{BASE_URL}/chat/completions", headers=headers, json=payload, timeout=DEFAULT_TIMEOUT)
+        response.raise_for_status()
+        result = response.json()
+        
+        if 'choices' in result and len(result['choices']) > 0:
+            content = result['choices'][0]['message']['content'].strip()
+            
+            # Parse JSON output
+            try:
+                # Handle potential markdown code blocks ```json ... ```
+                if content.startswith('```json'):
+                    content = content.replace('```json', '').replace('```', '')
+                elif content.startswith('```'):
+                    content = content.replace('```', '')
+                
+                content = content.strip()
+                json_output = json.loads(content)
+                
+                # Extract positive_prompt from various possible structures
+                optimized_prompt = None
+                
+                # Check if it's directly in the root
+                if 'positive_prompt' in json_output:
+                    optimized_prompt = json_output['positive_prompt']
+                # Check if it's in a nested structure like visual_schema_for_internal_use
+                elif 'visual_schema_for_internal_use' in json_output:
+                    schema = json_output['visual_schema_for_internal_use']
+                    if isinstance(schema, dict) and 'positive_prompt' in schema:
+                        optimized_prompt = schema['positive_prompt']
+                # Check if the entire thing is wrapped in another object
+                elif isinstance(json_output, dict):
+                    for key, value in json_output.items():
+                        if isinstance(value, dict) and 'positive_prompt' in value:
+                            optimized_prompt = value['positive_prompt']
+                            break
+                
+                # If we found it, return only the text
+                if optimized_prompt:
+                    # If it's still a dict/object, try to get just the text
+                    if isinstance(optimized_prompt, dict):
+                        # Look for common text fields
+                        optimized_prompt = optimized_prompt.get('text', 
+                                          optimized_prompt.get('value', 
+                                          optimized_prompt.get('content', str(optimized_prompt))))
+                    
+                    return jsonify({'optimized_prompt': optimized_prompt})
+                else:
+                    # If no positive_prompt found, return the whole content as fallback
+                    print(f"Warning: No positive_prompt found in JSON structure")
+                    return jsonify({'optimized_prompt': content})
+                    
+            except json.JSONDecodeError as e:
+                # Fallback if model didn't output valid JSON
+                print(f"Failed to parse JSON: {e}")
+                print(f"Content: {content}")
+                return jsonify({'optimized_prompt': content})
+                
+        else:
+            return jsonify({'error': 'Failed to get optimized prompt from API'}), 500
+
+    except requests.exceptions.RequestException as e:
+        print(f"API Request Error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/generate', methods=['POST'])
+def generate_image():
+    # Handle both JSON and FormData
+    if request.content_type.startswith('multipart/form-data'):
+        prompt = request.form.get('prompt')
+        model = request.form.get('model', MODEL_NAME)
+        ratio = request.form.get('ratio', '1:1')
+        image_files = request.files.getlist('image') # Get list of files
+    else:
+        data = request.json
+        prompt = data.get('prompt')
+        model = data.get('model', MODEL_NAME)
+        ratio = data.get('ratio', '1:1')
+        image_files = []
+
+    if not prompt:
+        return jsonify({"error": "No prompt provided"}), 400
+
+    print(f"Generating image for prompt: {prompt} using model {model} with ratio {ratio}")
+    if image_files:
+        print(f"Received {len(image_files)} reference images")
+    
+    # Map ratio to resolution
+    size_map = {
+        "1:1": "1024x1024",
+        "9:16": "720x1280",
+        "16:9": "1280x720",
+        "3:4": "768x1024",
+        "4:3": "1024x768"
+    }
+    
+    size = size_map.get(ratio, "1024x1024")
+
+    try:
+        if API_KEY == "YOUR_KEY_HERE":
+            return jsonify({"error": "Please configure your API_KEY in app.py"}), 500
+
+        headers = {
+            "Authorization": f"Bearer {API_KEY}"
+        }
+        
+        if image_files:
+            # Use /images/edits endpoint
+            url = f"{BASE_URL.rstrip('/')}/images/edits"
+            print(f"Sending Img2Img request to: {url}")
+            
+            # Prepare files list for requests
+            files_payload = []
+            for img in image_files:
+                files_payload.append(('image', (img.filename, img.read(), img.content_type)))
+            
+            data_payload = {
+                "model": model,
+                "prompt": prompt,
+                "n": 1,
+                "size": size
+            }
+            
+            response = _session().post(url, data=data_payload, files=files_payload, headers=headers, timeout=DEFAULT_TIMEOUT)
+            
+        else:
+            # Standard Image Generation Endpoint
+            headers["Content-Type"] = "application/json"
+            url = f"{BASE_URL.rstrip('/')}/images/generations"
+            payload = {
+                "model": model,
+                "prompt": prompt,
+                "n": 1,
+                "size": size 
+            }
+            print(f"Sending Image request to: {url} with size {size}")
+            response = _session().post(url, json=payload, headers=headers, timeout=DEFAULT_TIMEOUT)
+        
+        if response.status_code != 200:
+            return jsonify({"error": f"API Error: {response.text}"}), response.status_code
+            
+        result = response.json()
+        if 'data' in result and len(result['data']) > 0:
+            image_url = result['data'][0]['url']
+            
+            # Save to history
+            item = save_history_item(prompt, model, ratio, image_url)
+            
+        else:
+            return jsonify({"error": "Unexpected response format from API"}), 500
+    
+        return jsonify({"image_url": image_url, "image_path": item["image_path"] if item else None})
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/generate-ecommerce', methods=['POST'])
+def generate_ecommerce():
+    try:
+        scenario = request.form.get('scenario')
+        prompt = request.form.get('prompt')
+        model = request.form.get('model', MODEL_NAME)
+        ratio = request.form.get('ratio', '1:1')
+        marketing_copy = request.form.get('marketing_copy', '')
+        if scenario == 'taobao' and marketing_copy and contains_english(marketing_copy):
+            marketing_copy = translate_to_chinese(marketing_copy)
+        
+        # Handle file uploads if any
+        image_files = request.files.getlist('image')
+        
+        print(f"\n[Ecommerce] Starting generation for scenario: {scenario}")
+        print(f"[Ecommerce] Original Prompt: {prompt}")
+
+        if scenario == 'taobao':
+            # --- Step 1: Optimize Prompt with Gemini ---
+            print("\n[Step 1] Calling Gemini Brain (gemini-3-pro-preview) for optimization...")
+            optimized_prompt = optimize_for_taobao(prompt, marketing_copy)
+            print(f"[Step 1] Gemini Output: {optimized_prompt}")
+            
+            # --- Step 2: Generate Image with Nano Banana ---
+            print("\n[Step 2] Calling Nano Banana for image generation...")
+            # Reuse existing generation logic by calling internal function or mimicking request
+            # For simplicity, we'll call the generation logic directly here
+            gen_result = generate_image_internal(optimized_prompt, model, ratio, image_files)
+            image_url = gen_result["image_url"] if isinstance(gen_result, dict) else gen_result
+            image_path = gen_result.get("image_path") if isinstance(gen_result, dict) else None
+            print(f"[Step 2] Image Generated: {image_url}")
+            
+            # --- Step 3: Analyze Layout with Gemini Vision ---
+            print("\n[Step 3] Calling Gemini Vision (gemini-3-pro-preview) for layout analysis...")
+            layout_data = analyze_layout(image_url, marketing_copy)
+            print(f"[Step 3] Layout Analysis: {json.dumps(layout_data)}")
+            
+            return jsonify({
+                "image_url": image_url,
+                "image_path": image_path,
+                "layout": layout_data,
+                "optimized_prompt": optimized_prompt
+            })
+
+        elif scenario == 'amazon':
+            print("\n[Amazon Mode] Appending white background suffix...")
+            amazon_suffix = ", pure white background, hex code #FFFFFF, studio lighting, product photography, no props"
+            final_prompt = prompt + amazon_suffix
+            print(f"[Amazon Mode] Final Prompt: {final_prompt}")
+            
+            gen_result = generate_image_internal(final_prompt, model, ratio, image_files)
+            image_url = gen_result["image_url"] if isinstance(gen_result, dict) else gen_result
+            image_path = gen_result.get("image_path") if isinstance(gen_result, dict) else None
+            return jsonify({"image_url": image_url, "image_path": image_path})
+
+        else:
+            return jsonify({"error": "Unknown scenario"}), 400
+
+    except Exception as e:
+        print(f"Error in ecommerce generation: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+def contains_english(text):
+    """Check if text contains English characters"""
+    return bool(re.search(r'[a-zA-Z]', text))
+
+def translate_to_chinese(text):
+    """Translate text to Simplified Chinese using Gemini"""
+    try:
+        print(f"[Translation] Translating to Chinese: {text}")
+        response = _session().post(
+            f"{BASE_URL}/chat/completions",
+            headers={
+                'Authorization': f'Bearer {API_KEY}',
+                'Content-Type': 'application/json'
+            },
+            json={
+                'model': 'gemini-3-pro-preview',
+                'messages': [
+                    {'role': 'system', 'content': "You are a professional translator. Translate the following text to Simplified Chinese (简体中文). Return ONLY the translated text."},
+                    {'role': 'user', 'content': text}
+                ]
+            },
+            timeout=DEFAULT_TIMEOUT
+        )
+        if response.status_code == 200:
+            translation = response.json()['choices'][0]['message']['content'].strip()
+            print(f"[Translation] Result: {translation}")
+            return translation
+        return text
+    except Exception as e:
+        print(f"[Translation] Error: {e}")
+        return text
+
+def optimize_for_taobao(prompt, marketing_copy=""):
+    """使用 Gemini 优化淘宝场景的 Prompt，并自动识别视觉风格"""
+    
+    system_prompt = f"""
+你是一位专业的电商视觉设计专家。请分析产品并返回优化后的生图指令。
+
+**核心任务**：
+1. 分析产品类型，选择最合适的视觉风格
+2. 生成优化后的英文图片描述
+3. 提取营销文案的关键卖点
+
+**5 大视觉风格**：
+- Tech_Dark: 科技黑（数码产品、智能设备）- 深色背景、冷色调、未来感
+- Pure_Clinical: 科研白（护肤品、医疗用品、保健品）- 纯白背景、简洁、专业
+- Organic_Warm: 自然暖（食品、厨具、家居用品）- 暖色调、自然光、温馨
+- Vibrant_Pop: 多巴胺（零食、潮流产品、儿童用品）- 高饱和度、活力、年轻
+- Luxury_Gold: 奢华金（高端产品、礼品、珠宝）- 金色元素、精致、高级
+
+**返回格式（必须是有效的 JSON）**：
+{{
+    "style_id": "选择的风格ID（必须是上述5个之一）",
+    "optimized_prompt": "优化后的英文生图描述（简洁专业）",
+    "title": "主标题（中文，8-12字，突出核心卖点）",
+    "subtitle": "副标题（中文，可选，补充说明）",
+    "badges": ["卖点1", "卖点2"]
+}}
+
+**核心材质约束**：严禁添加用户未指定的材质描述（如"金属"、"玻璃"、"磨砂"等）。必须保持产品原本的材质特征。
+
+**当前产品**: {prompt}
+**营销文案**: {marketing_copy if marketing_copy else "无"}
+
+请严格按照 JSON 格式返回，确保 style_id 是上述 5 个之一。
+"""
+    
+    user_content = "请分析产品并返回 JSON 格式的结果"
+    
+    try:
+        print(f"[Gemini Optimization] Sending request to {BASE_URL}/chat/completions")
+        response = _session().post(
+            f"{BASE_URL}/chat/completions",
+            headers={
+                'Authorization': f'Bearer {API_KEY}',
+                'Content-Type': 'application/json'
+            },
+            json={
+                'model': 'gemini-3-pro-preview',
+                'messages': [
+                    {'role': 'system', 'content': system_prompt},
+                    {'role': 'user', 'content': user_content}
+                ],
+                'response_format': {'type': 'json_object'}
+            },
+            timeout=DEFAULT_TIMEOUT
+        )
+        
+        print(f"[Gemini Optimization] Status Code: {response.status_code}")
+        if response.status_code == 200:
+            content = response.json()['choices'][0]['message']['content']
+            print(f"[Gemini Optimization] Success. Content: {content[:200]}...")
+            
+            # Parse JSON response
+            try:
+                # Clean up markdown code blocks if present
+                if "```json" in content:
+                    content = content.split("```json")[1].split("```")[0]
+                elif "```" in content:
+                    content = content.split("```")[1].split("```")[0]
+                
+                data = json.loads(content.strip())
+                
+                # Extract fields
+                style_id = data.get('style_id', 'Organic_Warm')  # Default to Organic_Warm
+                optimized_prompt = data.get('optimized_prompt', prompt)
+                title = data.get('title', '')
+                subtitle = data.get('subtitle', '')
+                badges = data.get('badges', [])
+                
+                # Validate style_id
+                valid_styles = ['Tech_Dark', 'Pure_Clinical', 'Organic_Warm', 'Vibrant_Pop', 'Luxury_Gold']
+                if style_id not in valid_styles:
+                    print(f"[Warning] Invalid style_id '{style_id}', defaulting to 'Organic_Warm'")
+                    style_id = 'Organic_Warm'
+                
+                print(f"[Gemini] Detected Style: {style_id}")
+                print(f"[Gemini] Title: {title}")
+                
+                return {
+                    'style_id': style_id,
+                    'prompt': optimized_prompt,
+                    'title': title,
+                    'subtitle': subtitle,
+                    'badges': badges
+                }
+                
+            except json.JSONDecodeError as e:
+                print(f"[Gemini] JSON parse error: {e}")
+                print(f"[Gemini] Falling back to plain text mode")
+                return {
+                    'style_id': 'Organic_Warm',
+                    'prompt': content,
+                    'title': '',
+                    'subtitle': '',
+                    'badges': []
+                }
+        else:
+            print(f"[Gemini Optimization] Failed. Response: {response.text}")
+            return {
+                'style_id': 'Organic_Warm',
+                'prompt': prompt,
+                'title': '',
+                'subtitle': '',
+                'badges': []
+            }
+            
+    except Exception as e:
+        print(f"[Gemini Optimization] Exception: {e}")
+        return {
+            'style_id': 'Organic_Warm',
+            'prompt': prompt,
+            'title': '',
+            'subtitle': '',
+            'badges': []
+        }
+
+def analyze_layout(image_url, marketing_copy):
+    """Call Gemini Vision to analyze layout"""
+    system_instruction = """
+    你是电商视觉总监（Vision 模式）。请基于所给产品图进行中文排版规划，严格遵循“视觉策略库”。
+    视觉策略库：
+    - F型视觉路径：主标题与核心卖点优先布局在左上/左侧。
+    - 颜色情感映射：红=促销/紧迫，金=高端/信任，白=清爽；需保证文本与背景对比度充足。
+    - 损失厌恶文案：适度加入“错过/限时/库存”等提示提升转化。
+    输出规范（Taobao_Master_Layout_System）：
+    返回 JSON：
+    {
+      "Taobao_Master_Layout_System": {
+        "layout_template": "layout-classic-left|layout-modern-bottom|layout-clean-right",
+        "badges": ["简体中文短标签", "简体中文短标签"],
+        "background_fx": {
+          "style": "text-style-a|text-style-b|text-style-c",
+          "visual_path": "F-path|Z-path",
+          "color_strategy": {"primary": "#RRGGBB", "accent": "#RRGGBB", "emotion": "促销/高端/清爽"}
+        },
+        "title": "{copy}",
+        "subtitle": "4-6 字简体中文副标题"
+      }
+    }
+    所有可见文案必须为简体中文，仅返回有效 JSON。
+    """
+    
+    copy_text = marketing_copy if marketing_copy else "Hot Sale"
+    formatted_instruction = system_instruction.replace("{copy}", copy_text)
+    
+    try:
+        print(f"[Gemini Vision] Sending request to {BASE_URL}/chat/completions")
+        response = _session().post(
+            f"{BASE_URL}/chat/completions",
+            headers={
+                'Authorization': f'Bearer {API_KEY}',
+                'Content-Type': 'application/json'
+            },
+            json={
+                'model': 'gemini-3-pro-preview', # Standard model name
+                'messages': [
+                    {'role': 'system', 'content': formatted_instruction},
+                    {
+                        'role': 'user', 
+                        'content': [
+                            {'type': 'text', 'text': 'Analyze whitespace for text placement'},
+                            {'type': 'image_url', 'image_url': {'url': image_url}}
+                        ]
+                    }
+                ],
+                'response_format': {'type': 'json_object'}
+            },
+            timeout=DEFAULT_TIMEOUT
+        )
+        
+        print(f"[Gemini Vision] Status Code: {response.status_code}")
+        if response.status_code == 200:
+            content = response.json()['choices'][0]['message']['content']
+            print(f"[Gemini Vision] Success. Content: {content[:100]}...")
+            # Clean up json string if needed
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0]
+            elif "```" in content:
+                content = content.split("```")[1].split("```")[0]
+            
+            layout_data_raw = json.loads(content)
+
+            if 'Taobao_Master_Layout_System' in layout_data_raw:
+                tmls = layout_data_raw['Taobao_Master_Layout_System']
+                title_val = tmls.get('title', '')
+                subtitle_val = tmls.get('subtitle', '')
+                badges_val = tmls.get('badges', [])
+                if title_val and contains_english(title_val):
+                    title_val = translate_to_chinese(title_val)
+                if subtitle_val and contains_english(subtitle_val):
+                    subtitle_val = translate_to_chinese(subtitle_val)
+                badges_val = [translate_to_chinese(b) if contains_english(b) else b for b in badges_val]
+                tmls['title'] = title_val
+                tmls['subtitle'] = subtitle_val
+                tmls['badges'] = badges_val
+                style_val = (tmls.get('background_fx') or {}).get('style', 'text-style-a')
+                selected_layout_val = tmls.get('layout_template', 'layout-classic-left')
+                layout_data = {
+                    'Taobao_Master_Layout_System': tmls,
+                    'selected_layout': selected_layout_val,
+                    'style': style_val,
+                    'badges': badges_val,
+                    'title': title_val,
+                    'subtitle': subtitle_val
+                }
+            else:
+                layout_data = layout_data_raw
+            
+            if 'title' in layout_data and contains_english(layout_data['title']):
+                layout_data['title'] = translate_to_chinese(layout_data['title'])
+            if 'subtitle' in layout_data and contains_english(layout_data['subtitle']):
+                layout_data['subtitle'] = translate_to_chinese(layout_data['subtitle'])
+            if 'badges' in layout_data:
+                layout_data['badges'] = [translate_to_chinese(badge) if contains_english(badge) else badge for badge in layout_data['badges']]
+                
+            return layout_data
+        else:
+            print(f"[Gemini Vision] Failed. Response: {response.text}")
+            return {"text_positions": []}
+
+        url = f"{BASE_URL.rstrip('/')}/images/edits"
+        files_payload = []
+        for img in image_files:
+            # Reset file pointer if it was read before
+            img.seek(0)
+            files_payload.append(('image', (img.filename, img.read(), img.content_type)))
+        
+        data_payload = {
+            "model": model,
+            "prompt": prompt,
+            "n": 1,
+            "size": size
+        }
+        
+        print(f"\n{'='*60}")
+        print(f"[Img2Img] 图生图请求详情")
+        print(f"{'='*60}")
+        print(f"[Img2Img] 端点: {url}")
+        print(f"[Img2Img] 图片数量: {len(image_files)}")
+        for idx, img in enumerate(image_files):
+            img.seek(0)
+            content = img.read()
+            print(f"[Img2Img] 图片 {idx+1}: {img.filename}")
+            print(f"[Img2Img]   - 大小: {len(content)} bytes")
+            print(f"[Img2Img]   - 类型: {img.content_type}")
+            img.seek(0)
+        print(f"[Img2Img] Payload:")
+        print(json.dumps(data_payload, indent=2, ensure_ascii=False))
+        print(f"{'='*60}\n")
+        
+        response = _session().post(url, data=data_payload, files=files_payload, headers=headers, timeout=DEFAULT_TIMEOUT)
+    else:
+        # Text2Img
+        url = f"{BASE_URL.rstrip('/')}/images/generations"
+        headers["Content-Type"] = "application/json"
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "n": 1,
+            "size": size
+        }
+        response = _session().post(url, json=payload, headers=headers, timeout=DEFAULT_TIMEOUT)
+        
+    if response.status_code != 200:
+        raise Exception(f"Image Generation Failed: {response.text}")
+        
+    result = response.json()
+    if 'data' in result and len(result['data']) > 0:
+        image_url = result['data'][0]['url']
+        item = save_history_item(prompt, model, ratio, image_url)
+        return {"image_url": image_url, "image_path": item["image_path"] if item else None}
+    else:
+        raise Exception("No image data in response")
+
+if __name__ == '__main__':
+    print(f"Server starting... Please ensure API_KEY is set in app.py")
+    ensure_history_dir()
+    app.run(debug=True, port=5000)

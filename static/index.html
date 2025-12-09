@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nanobanan Pro | E-Commerce AI Studio</title>
+    <link rel="stylesheet" href="style.css?v=8">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo-area">
+                <div class="logo-icon">V</div>
+                <span class="app-name">AI Visual Studio - E-Commerce</span>
+            </div>
+            <div class="header-controls">
+                <button id="historyBtn" class="icon-btn">📜 History</button>
+                <button class="icon-btn">⚙️ Settings</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="workspace">
+            <!-- History Sidebar -->
+            <aside id="historySidebar" class="history-sidebar hidden">
+                <div class="history-header">
+                    <h3>History</h3>
+                    <button id="closeHistoryBtn" class="icon-btn">×</button>
+                    <button id="migrateHistoryBtn" class="icon-btn">🧹 Clean</button>
+                </div>
+                <div id="historyList" class="history-list">
+                    <!-- History items will be injected here -->
+                </div>
+            </aside>
+
+            <!-- Left Panel: Controls -->
+            <aside class="control-panel">
+
+                <!-- Model Selector -->
+                <div class="control-group">
+                    <label>Model</label>
+                    <select id="modelSelect" class="full-width-select">
+                        <option value="nano-banana">Nano Banana</option>
+                        <option value="nano-banana-2">Nano Banana 2</option>
+                        <option value="nano-banana-2-4k">Nano Banana 2 4K</option>
+                    </select>
+                </div>
+
+                <!-- Scenario Selector -->
+                <div class="control-group">
+                    <label>应用场景 (Scenario)</label>
+                    <select id="scenarioSelect" class="full-width-select">
+                        <option value="free">自由创作 (Free Mode)</option>
+                        <option value="commerce">电商分组 (Commerce)</option>
+                    </select>
+                </div>
+
+                <!-- Reference Image -->
+                <div class="control-group">
+                    <label>Reference Image</label>
+                    <div class="upload-box" id="uploadBox">
+                        <div class="upload-content">
+                            <span class="plus-icon">+</span>
+                            <span>Add Reference Image</span>
+                        </div>
+                        <input type="file" id="refImageInput" multiple hidden>
+                    </div>
+                </div>
+
+                <!-- Aspect Ratio -->
+                <div class="control-group">
+                    <label>Aspect Ratio</label>
+                    <div class="ratio-grid">
+                        <button class="ratio-btn" data-ratio="9:16">
+                            <div class="ratio-preview r-9-16"></div>
+                            <span>9:16</span>
+                        </button>
+                        <button class="ratio-btn" data-ratio="3:4">
+                            <div class="ratio-preview r-3-4"></div>
+                            <span>3:4</span>
+                        </button>
+                        <button class="ratio-btn active" data-ratio="1:1">
+                            <div class="ratio-preview r-1-1"></div>
+                            <span>1:1</span>
+                        </button>
+                        <button class="ratio-btn" data-ratio="4:3">
+                            <div class="ratio-preview r-4-3"></div>
+                            <span>4:3</span>
+                        </button>
+                        <button class="ratio-btn" data-ratio="16:9">
+                            <div class="ratio-preview r-16-9"></div>
+                            <span>16:9</span>
+                        </button>
+                        <button class="ratio-btn" data-ratio="21:9">
+                            <div class="ratio-preview r-21-9" style="width: 42px; height: 18px; border: 2px solid #666; border-radius: 2px;"></div>
+                            <span>21:9</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Prompt Input -->
+                <div class="control-group flex-grow" id="promptGroup">
+                    <label>Your Prompt</label>
+                    <div class="prompt-container">
+                        <textarea id="promptInput"
+                            placeholder="Describe your imagination... e.g. 'Cyberpunk city night'"></textarea>
+                        <button id="magicBtn" class="magic-btn" title="Optimize Prompt">🪄</button>
+                    </div>
+                </div>
+
+                <!-- Optimized Prompt Output -->
+                <div class="control-group flex-grow hidden" id="optimizedPromptGroup">
+                    <label>✨ Optimized Prompt</label>
+                    <div class="prompt-container">
+                        <textarea id="optimizedPromptInput"
+                            placeholder="Optimized prompt will appear here..."></textarea>
+                        <button id="clearOptimizedBtn" class="clear-optimized-btn"
+                            title="Clear Optimized Prompt">×</button>
+                    </div>
+                </div>
+
+                <!-- Taobao Marketing Copy Input (only visible in Taobao mode) -->
+                <div class="control-group hidden" id="taobaoCopyGroup">
+                    <label>营销文案 (Marketing Copy)</label>
+                    <input type="text" id="taobaoCopyInput" class="full-width-input"
+                        placeholder="例如: 限时半价、买一送一 (留空则AI自动生成)">
+                </div>
+
+                <!-- Detail Page Panels (only visible in Detail mode) -->
+                <div id="detailPanelsContainer" class="hidden">
+                    <div class="detail-panels-header">
+                        <label>详情页板块 (Detail Panels)</label>
+                        <button id="addPanelBtn" class="add-panel-btn">+ 添加板块</button>
+                    </div>
+                    <div id="detailPanelsList">
+                        <!-- Panels will be dynamically added here -->
+                    </div>
+                </div>
+
+                <!-- Generate Button -->
+                <button id="generateBtn" class="primary-btn">
+                    <span class="btn-text">✨ Generate</span>
+                    <span class="loader"></span>
+                </button>
+            </aside>
+
+            <!-- Right Panel: Preview -->
+            <section class="preview-panel">
+                <!-- Single Image View (Free/Taobao/Amazon modes) -->
+                <div id="singleImageView">
+                    <div id="imageContainer" class="empty-state">
+                        <div class="empty-content">
+                            <span class="empty-icon">✨</span>
+                            <p>Generated images will appear here.</p>
+                        </div>
+                        <!-- Canvas container for text overlays -->
+                        <div id="canvasContainer" class="hidden canvas-container">
+                            <img id="generatedImage" src="" alt="Generated Art">
+                            <div id="textOverlay" class="text-overlay-container"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detail Page List View (Detail mode only) -->
+                <div id="detailListView" class="hidden detail-list-view">
+                    <div class="detail-list-header">
+                        <h3>详情页预览 (Detail Page Preview)</h3>
+                        <button id="downloadDetailBtn" class="icon-btn">📥 Download</button>
+                    </div>
+                    <div id="detailImageList" class="detail-image-list">
+                        <!-- Detail page images will be added here -->
+                    </div>
+                </div>
+    </div>
+    </div>
+    </div>
+
+    <!-- Image Modal for Preview/Zoom -->
+    <div id="imageModal" class="modal hidden">
+        <div class="modal-content">
+            <button id="closeModalBtn" class="modal-close-btn">×</button>
+            <div class="modal-image-container">
+                <img id="modalImage" src="" alt="Preview">
+            </div>
+            <div id="modalPrompt" class="modal-info"></div>
+            <div class="modal-actions">
+                <button id="downloadCompositeBtn" class="icon-btn">📥 Download</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal hidden">
+        <div class="modal-content settings-modal-content">
+            <div class="modal-header">
+                <h3>Settings</h3>
+                <button id="closeSettingsBtn" class="modal-close-btn">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="control-group">
+                    <label>API Key</label>
+                    <input type="password" id="apiKeyInput" class="full-width-input" placeholder="sk-...">
+                    <p class="help-text" style="font-size: 0.8em; color: #888; margin-top: 5px;">Your key is stored
+                        locally in your browser.</p>
+                </div>
+            </div>
+            <div class="modal-footer" style="margin-top: 20px; text-align: right;">
+                <button id="saveSettingsBtn" class="primary-btn">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js?v=5"></script>
+</body>
+
+</html>
